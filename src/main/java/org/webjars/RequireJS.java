@@ -1,10 +1,10 @@
 package org.webjars;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.fasterxml.jackson.databind.node.TextNode;
+import com.fasterxml.jackson.databind.node.*;
+
 import static com.fasterxml.jackson.core.JsonParser.Feature.ALLOW_UNQUOTED_FIELD_NAMES;
 import static com.fasterxml.jackson.core.JsonParser.Feature.ALLOW_SINGLE_QUOTES;
 import org.slf4j.Logger;
@@ -118,7 +118,7 @@ public final class RequireJS {
                 // assemble the WebJar config string
 
                 // default to the new pom.xml meta-data way
-                ObjectNode webJarObjectNode = getWebJarRequireJsConfig(webJar, prefixesWithVersion);
+                ObjectNode webJarObjectNode = getWebJarSetupJson(prefixesWithVersion, webJar);
                 if (webJarObjectNode.size() != 0) {
                     webJarConfigsString.append("\n").append("requirejs.config(").append(webJarObjectNode.toString()).append(")");
                 } else {
@@ -224,10 +224,22 @@ public final class RequireJS {
         Map<String, ObjectNode> jsonConfigs = new HashMap<String, ObjectNode>();
 
         for (Map.Entry<String, String> webJar : webJars.entrySet()) {
-            jsonConfigs.put(webJar.getKey(), getWebJarRequireJsConfig(webJar, prefixes));
+            jsonConfigs.put(webJar.getKey(), getWebJarSetupJson(prefixes, webJar));
         }
 
         return jsonConfigs;
+    }
+
+    private static ObjectNode getWebJarSetupJson(List<Map.Entry<String, Boolean>> prefixes, Map.Entry<String, String> webJar) {
+        String bowerJsonPath = WebJarAssetLocator.WEBJARS_PATH_PREFIX + "/" + webJar.getKey() + "/" + webJar.getValue() + "/" + "bower.json";
+        if (RequireJS.class.getClassLoader().getResource(bowerJsonPath) != null) {
+            // create the requirejs config from the bower.json
+            return getBowerWebJarRequireJsConfig(webJar, prefixes, bowerJsonPath);
+        }
+        else {
+            // get the requirejs config from the pom
+            return getWebJarRequireJsConfig(webJar, prefixes);
+        }
     }
 
     /**
@@ -340,6 +352,92 @@ public final class RequireJS {
         }
 
         return webJarRequireJsNode;
+    }
+
+
+    /**
+     * Returns the JSON RequireJS config for a given Bower WebJar
+     *
+     * @param webJar   A tuple (artifactId -&gt; version) representing the WebJar.
+     * @param prefixes A list of the prefixes to use in the `paths` part of the RequireJS config.
+     * @param bowerJsonPath The path to the bower.json file.
+     * @return The JSON RequireJS config for the WebJar based on the meta-data in the WebJar's pom.xml file.
+     */
+    public static ObjectNode getBowerWebJarRequireJsConfig(Map.Entry<String, String> webJar, List<Map.Entry<String, Boolean>> prefixes, String bowerJsonPath) {
+
+        InputStream inputStream = RequireJS.class.getClassLoader().getResourceAsStream(bowerJsonPath);
+
+        if (inputStream != null) {
+            try {
+                ObjectMapper mapper = new ObjectMapper()
+                        .configure(ALLOW_UNQUOTED_FIELD_NAMES, true)
+                        .configure(ALLOW_SINGLE_QUOTES, true);
+
+                ObjectNode requireConfig = mapper.createObjectNode();
+                ObjectNode requireConfigPaths = requireConfig.putObject("paths");
+
+                JsonNode jsonNode = mapper.readTree(inputStream);
+
+                String name = jsonNode.get("name").asText();
+
+                if (jsonNode.get("main").getNodeType() == JsonNodeType.STRING) {
+                    String main = jsonNode.get("main").asText();
+                    requireConfigPaths.put(name, mainJsToPathJson(webJar, main, prefixes));
+                }
+                else if (jsonNode.get("main").getNodeType() == JsonNodeType.ARRAY) {
+                    for (JsonNode mainJsonNode : jsonNode.withArray("main")) {
+                        String main = mainJsonNode.asText();
+                        requireConfigPaths.put(name, mainJsToPathJson(webJar, main, prefixes));
+                    }
+                }
+
+                // todo add dependency shims
+
+                return requireConfig;
+
+            } catch (JsonProcessingException e) {
+                e.printStackTrace();
+                log.warn("Could not create the RequireJS config for the " + webJar.getKey() + " " + webJar.getValue() + " Bower WebJar" + "\n" +
+                        "Please file a bug at: http://github.com/webjars/webjars-locator/issues/new");
+            } catch (IOException e) {
+                e.printStackTrace();
+                log.warn("Could not create the RequireJS config for the " + webJar.getKey() + " " + webJar.getValue() + " Bower WebJar" + "\n" +
+                        "Please file a bug at: http://github.com/webjars/webjars-locator/issues/new");
+            } finally {
+                try {
+                    inputStream.close();
+                } catch (IOException e) {
+                    // what-evs
+                }
+            }
+
+        }
+
+        return null;
+    }
+
+    private static JsonNode mainJsToPathJson(Map.Entry<String, String> webJar, String main, List<Map.Entry<String, Boolean>> prefixes) {
+        String requireJsStyleMain = main;
+        if (main.endsWith(".js")) {
+            requireJsStyleMain = main.substring(0, main.lastIndexOf(".js"));
+        }
+
+        if (requireJsStyleMain.startsWith("./")) {
+            requireJsStyleMain = requireJsStyleMain.substring(2);
+        }
+
+        String unprefixedMain = webJar.getKey() + "/" + webJar.getValue() + "/" + requireJsStyleMain;
+
+        if (prefixes.size() == 1) {
+            return new TextNode(prefixes.get(0).getKey() + unprefixedMain);
+        }
+        else {
+            ArrayNode arrayNode = new ArrayNode(JsonNodeFactory.instance);
+            for (Map.Entry<String, Boolean> prefix : prefixes) {
+                arrayNode.add(prefix.getKey() + unprefixedMain);
+            }
+            return arrayNode;
+        }
     }
 
     /**
