@@ -118,7 +118,7 @@ public final class RequireJS {
                 // assemble the WebJar config string
 
                 // default to the new pom.xml meta-data way
-                ObjectNode webJarObjectNode = getWebJarSetupJson(prefixesWithVersion, webJar);
+                ObjectNode webJarObjectNode = getWebJarSetupJson(webJar, prefixesWithVersion);
                 if (webJarObjectNode.size() != 0) {
                     webJarConfigsString.append("\n").append("requirejs.config(").append(webJarObjectNode.toString()).append(")");
                 } else {
@@ -224,13 +224,13 @@ public final class RequireJS {
         Map<String, ObjectNode> jsonConfigs = new HashMap<String, ObjectNode>();
 
         for (Map.Entry<String, String> webJar : webJars.entrySet()) {
-            jsonConfigs.put(webJar.getKey(), getWebJarSetupJson(prefixes, webJar));
+            jsonConfigs.put(webJar.getKey(), getWebJarSetupJson(webJar, prefixes));
         }
 
         return jsonConfigs;
     }
 
-    private static ObjectNode getWebJarSetupJson(List<Map.Entry<String, Boolean>> prefixes, Map.Entry<String, String> webJar) {
+    private static ObjectNode getWebJarSetupJson(Map.Entry<String, String> webJar, List<Map.Entry<String, Boolean>> prefixes) {
         String bowerJsonPath = WebJarAssetLocator.WEBJARS_PATH_PREFIX + "/" + webJar.getKey() + "/" + webJar.getValue() + "/" + "bower.json";
         if (RequireJS.class.getClassLoader().getResource(bowerJsonPath) != null) {
             // create the requirejs config from the bower.json
@@ -428,16 +428,13 @@ public final class RequireJS {
 
         String unprefixedMain = webJar.getKey() + "/" + webJar.getValue() + "/" + requireJsStyleMain;
 
-        if (prefixes.size() == 1) {
-            return new TextNode(prefixes.get(0).getKey() + unprefixedMain);
+        ArrayNode arrayNode = new ArrayNode(JsonNodeFactory.instance);
+
+        for (Map.Entry<String, Boolean> prefix : prefixes) {
+            arrayNode.add(prefix.getKey() + unprefixedMain);
         }
-        else {
-            ArrayNode arrayNode = new ArrayNode(JsonNodeFactory.instance);
-            for (Map.Entry<String, Boolean> prefix : prefixes) {
-                arrayNode.add(prefix.getKey() + unprefixedMain);
-            }
-            return arrayNode;
-        }
+
+        return arrayNode;
     }
 
     /**
