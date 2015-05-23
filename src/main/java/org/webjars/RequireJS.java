@@ -119,7 +119,7 @@ public final class RequireJS {
 
                 // default to the new pom.xml meta-data way
                 ObjectNode webJarObjectNode = getWebJarSetupJson(webJar, prefixesWithVersion);
-                if (webJarObjectNode.size() != 0) {
+                if ((webJarObjectNode != null ? webJarObjectNode.size() : 0) != 0) {
                     webJarConfigsString.append("\n").append("requirejs.config(").append(webJarObjectNode.toString()).append(")");
                 } else {
                     webJarConfigsString.append("\n").append(getWebJarConfig(webJar));
@@ -231,15 +231,21 @@ public final class RequireJS {
     }
 
     private static ObjectNode getWebJarSetupJson(Map.Entry<String, String> webJar, List<Map.Entry<String, Boolean>> prefixes) {
-        String bowerJsonPath = WebJarAssetLocator.WEBJARS_PATH_PREFIX + "/" + webJar.getKey() + "/" + webJar.getValue() + "/" + "bower.json";
-        if (RequireJS.class.getClassLoader().getResource(bowerJsonPath) != null) {
-            // create the requirejs config from the bower.json
-            return getBowerWebJarRequireJsConfig(webJar, prefixes, bowerJsonPath);
+
+        if (RequireJS.class.getClassLoader().getResource("META-INF/maven/org.webjars.npm/" + webJar.getKey() + "/pom.xml") != null) {
+            // create the requirejs config from the package.json
+            return getNpmWebJarRequireJsConfig(webJar, prefixes);
         }
-        else {
+        else if (RequireJS.class.getClassLoader().getResource("META-INF/maven/org.webjars.bower/" + webJar.getKey() + "/pom.xml") != null) {
+            // create the requirejs config from the bower.json
+            return getBowerWebJarRequireJsConfig(webJar, prefixes);
+        }
+        else if (RequireJS.class.getClassLoader().getResource("META-INF/maven/org.webjars/" + webJar.getKey() + "/pom.xml") != null) {
             // get the requirejs config from the pom
             return getWebJarRequireJsConfig(webJar, prefixes);
         }
+
+        return null;
     }
 
     /**
@@ -360,12 +366,31 @@ public final class RequireJS {
      *
      * @param webJar   A tuple (artifactId -&gt; version) representing the WebJar.
      * @param prefixes A list of the prefixes to use in the `paths` part of the RequireJS config.
-     * @param bowerJsonPath The path to the bower.json file.
      * @return The JSON RequireJS config for the WebJar based on the meta-data in the WebJar's pom.xml file.
      */
-    public static ObjectNode getBowerWebJarRequireJsConfig(Map.Entry<String, String> webJar, List<Map.Entry<String, Boolean>> prefixes, String bowerJsonPath) {
+    public static ObjectNode getBowerWebJarRequireJsConfig(Map.Entry<String, String> webJar, List<Map.Entry<String, Boolean>> prefixes) {
 
-        InputStream inputStream = RequireJS.class.getClassLoader().getResourceAsStream(bowerJsonPath);
+        String bowerJsonPath = WebJarAssetLocator.WEBJARS_PATH_PREFIX + "/" + webJar.getKey() + "/" + webJar.getValue() + "/" + "bower.json";
+
+        return getWebJarRequireJsConfigFromMainConfig(webJar, prefixes, bowerJsonPath);
+    }
+
+    /**
+     * Returns the JSON RequireJS config for a given Bower WebJar
+     *
+     * @param webJar   A tuple (artifactId -&gt; version) representing the WebJar.
+     * @param prefixes A list of the prefixes to use in the `paths` part of the RequireJS config.
+     * @return The JSON RequireJS config for the WebJar based on the meta-data in the WebJar's pom.xml file.
+     */
+    public static ObjectNode getNpmWebJarRequireJsConfig(Map.Entry<String, String> webJar, List<Map.Entry<String, Boolean>> prefixes) {
+
+        String packageJsonPath = WebJarAssetLocator.WEBJARS_PATH_PREFIX + "/" + webJar.getKey() + "/" + webJar.getValue() + "/" + "package.json";
+
+        return getWebJarRequireJsConfigFromMainConfig(webJar, prefixes, packageJsonPath);
+    }
+
+    private static ObjectNode getWebJarRequireJsConfigFromMainConfig(Map.Entry<String, String> webJar, List<Map.Entry<String, Boolean>> prefixes, String path) {
+        InputStream inputStream = RequireJS.class.getClassLoader().getResourceAsStream(path);
 
         if (inputStream != null) {
             try {
@@ -397,11 +422,11 @@ public final class RequireJS {
 
             } catch (JsonProcessingException e) {
                 e.printStackTrace();
-                log.warn("Could not create the RequireJS config for the " + webJar.getKey() + " " + webJar.getValue() + " Bower WebJar" + "\n" +
+                log.warn("Could not create the RequireJS config for the " + webJar.getKey() + " " + webJar.getValue() + " WebJar" + " from " + path + "\n" +
                         "Please file a bug at: http://github.com/webjars/webjars-locator/issues/new");
             } catch (IOException e) {
                 e.printStackTrace();
-                log.warn("Could not create the RequireJS config for the " + webJar.getKey() + " " + webJar.getValue() + " Bower WebJar" + "\n" +
+                log.warn("Could not create the RequireJS config for the " + webJar.getKey() + " " + webJar.getValue() + " WebJar" + " from " + path + "\n" +
                         "Please file a bug at: http://github.com/webjars/webjars-locator/issues/new");
             } finally {
                 try {
