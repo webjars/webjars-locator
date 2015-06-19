@@ -14,6 +14,8 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 import org.w3c.dom.Node;
 
+import org.apache.commons.lang3.StringUtils;
+
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -410,10 +412,12 @@ public final class RequireJS {
                     requireConfigPaths.put(name, mainJsToPathJson(webJar, main, prefixes));
                 }
                 else if (jsonNode.get("main").getNodeType() == JsonNodeType.ARRAY) {
+                    ArrayList<String> mainList = new ArrayList<>();
                     for (JsonNode mainJsonNode : jsonNode.withArray("main")) {
-                        String main = mainJsonNode.asText();
-                        requireConfigPaths.put(name, mainJsToPathJson(webJar, main, prefixes));
+                        mainList.add(mainJsonNode.asText());
                     }
+                    String main = getBowerBestMatchFromMainArray(mainList, name);
+                    requireConfigPaths.put(name, mainJsToPathJson(webJar, main, prefixes));
                 }
 
                 // todo add dependency shims
@@ -439,6 +443,58 @@ public final class RequireJS {
         }
 
         return null;
+    }
+
+    /*
+     * Heuristic approach to find the 'best' candidate which most likely is the main script of a package.
+     */
+
+    private static String getBowerBestMatchFromMainArray(ArrayList<String> items, String name) {
+        if(items.size() == 1) // not really much choice here
+            return items.get(0);
+
+        ArrayList<String> filteredList = new ArrayList<>();
+
+        // first idea: only look at .js files
+
+        for(String item : items) {
+            if(item.toLowerCase().endsWith(".js")) {
+                filteredList.add(item);
+            }
+        }
+
+        // ... if there are any
+        if(filteredList.size() == 0)
+            filteredList = items;
+
+        final HashMap<String, Integer> distanceMap = new HashMap<>();
+        final String nameForComparisons = name.toLowerCase();
+
+        // second idea: most scripts are named after the project's name
+        // sort all script files by their Levenshtein-distance
+        // and return the one which is most similar to the project's name
+
+        Collections.sort(filteredList, new Comparator<String>() {
+
+            public Integer getDistance(String value) {
+                int distance;
+                value = value.toLowerCase();
+                if (distanceMap.containsKey(value)) {
+                    distance = distanceMap.get(value);
+                } else {
+                    distance = StringUtils.getLevenshteinDistance(nameForComparisons, value);
+                    distanceMap.put(value, distance);
+                }
+                return distance;
+            }
+
+            @Override
+            public int compare(String o1, String o2) {
+                return getDistance(o1).compareTo(getDistance(o2));
+            }
+        });
+
+        return filteredList.get(0);
     }
 
     private static JsonNode mainJsToPathJson(Map.Entry<String, String> webJar, String main, List<Map.Entry<String, Boolean>> prefixes) {
@@ -562,4 +618,5 @@ public final class RequireJS {
 
         return webJarConfig;
     }
+
 }

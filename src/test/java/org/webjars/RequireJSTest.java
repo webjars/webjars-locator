@@ -69,6 +69,19 @@ public class RequireJSTest {
     }
 
     @Test
+    public void should_pick_right_script_in_bower_webjars() {
+        Map<String, ObjectNode> jsonNoCdn = RequireJS.getSetupJson(WEBJAR_URL_PREFIX);
+
+        assertEquals(WEBJAR_URL_PREFIX + "angular-schema-form/0.8.2/dist/schema-form", jsonNoCdn.get("angular-schema-form").get("paths").get("angular-schema-form").get(0).asText());
+
+        Map<String, ObjectNode> jsonWithCdn = RequireJS.getSetupJson(WEBJAR_CDN_PREFIX, WEBJAR_URL_PREFIX);
+
+        assertEquals(WEBJAR_CDN_PREFIX + "angular-schema-form/0.8.2/dist/schema-form", jsonWithCdn.get("angular-schema-form").get("paths").get("angular-schema-form").get(0).asText());
+        assertEquals(WEBJAR_URL_PREFIX + "angular-schema-form/0.8.2/dist/schema-form", jsonWithCdn.get("angular-schema-form").get("paths").get("angular-schema-form").get(1).asText());
+    }
+
+
+    @Test
     public void should_work_with_npm_webjars() {
         Map<String, ObjectNode> jsonNoCdn = RequireJS.getSetupJson(WEBJAR_URL_PREFIX);
 

@@ -61,6 +61,11 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>3.4</version>
+        </dependency>
+        <dependency>
             <groupId>org.webjars</groupId>
             <artifactId>bootstrap</artifactId>
             <version>3.1.1-1</version>
@@ -94,6 +99,12 @@
             <groupId>org.webjars.bower</groupId>
             <artifactId>angular-bootstrap</artifactId>
             <version>0.13.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.webjars.bower</groupId>
+            <artifactId>angular-schema-form</artifactId>
+            <version>0.8.2</version>
             <scope>test</scope>
         </dependency>
         <dependency>
