@@ -410,10 +410,12 @@ public final class RequireJS {
                     requireConfigPaths.put(name, mainJsToPathJson(webJar, main, prefixes));
                 }
                 else if (jsonNode.get("main").getNodeType() == JsonNodeType.ARRAY) {
+                    ArrayList<String> mainList = new ArrayList<>();
                     for (JsonNode mainJsonNode : jsonNode.withArray("main")) {
-                        String main = mainJsonNode.asText();
-                        requireConfigPaths.put(name, mainJsToPathJson(webJar, main, prefixes));
+                        mainList.add(mainJsonNode.asText());
                     }
+                    String main = getBowerBestMatchFromMainArray(mainList, name);
+                    requireConfigPaths.put(name, mainJsToPathJson(webJar, main, prefixes));
                 }
 
                 // todo add dependency shims
@@ -439,6 +441,58 @@ public final class RequireJS {
         }
 
         return null;
+    }
+
+    /*
+     * Heuristic approach to find the 'best' candidate which most likely is the main script of a package.
+     */
+
+    private static String getBowerBestMatchFromMainArray(ArrayList<String> items, String name) {
+        if(items.size() == 1) // not really much choice here
+            return items.get(0);
+
+        ArrayList<String> filteredList = new ArrayList<>();
+
+        // first idea: only look at .js files
+
+        for(String item : items) {
+            if(item.toLowerCase().endsWith(".js")) {
+                filteredList.add(item);
+            }
+        }
+
+        // ... if there are any
+        if(filteredList.size() == 0)
+            filteredList = items;
+
+        final HashMap<String, Integer> distanceMap = new HashMap<>();
+        final String nameForComparisons = name.toLowerCase();
+
+        // second idea: most scripts are named after the project's name
+        // sort all script files by their Levenshtein-distance
+        // and return the one which is most similar to the project's name
+
+        Collections.sort(filteredList, new Comparator<String>() {
+
+            public Integer getDistance(String value) {
+                int distance;
+                value = value.toLowerCase();
+                if (distanceMap.containsKey(value)) {
+                    distance = distanceMap.get(value);
+                } else {
+                    distance = getLevenshteinDistance(nameForComparisons, value);
+                    distanceMap.put(value, distance);
+                }
+                return distance;
+            }
+
+            @Override
+            public int compare(String o1, String o2) {
+                return getDistance(o1).compareTo(getDistance(o2));
+            }
+        });
+
+        return filteredList.get(0);
     }
 
     private static JsonNode mainJsToPathJson(Map.Entry<String, String> webJar, String main, List<Map.Entry<String, Boolean>> prefixes) {
@@ -561,5 +615,73 @@ public final class RequireJS {
         }
 
         return webJarConfig;
+    }
+
+    /*
+     * Levenshtein distance algorithm
+     * https://git-wip-us.apache.org/repos/asf?p=commons-lang.git;a=blob_plain;f=src/main/java/org/apache/commons/lang3/StringUtils.java;hb=HEAD
+     *
+     * Implementation taken from Apache Commons / Apache License 2.0
+     * http://www.apache.org/licenses/LICENSE-2.0
+     */
+
+    public static int getLevenshteinDistance(CharSequence s, CharSequence t) {
+        if (s == null || t == null) {
+            throw new IllegalArgumentException("Strings must not be null");
+        }
+
+        int n = s.length(); // length of s
+        int m = t.length(); // length of t
+
+        if (n == 0) {
+            return m;
+        } else if (m == 0) {
+            return n;
+        }
+
+        if (n > m) {
+            // swap the input strings to consume less memory
+            final CharSequence tmp = s;
+            s = t;
+            t = tmp;
+            n = m;
+            m = t.length();
+        }
+
+        int p[] = new int[n + 1]; //'previous' cost array, horizontally
+        int d[] = new int[n + 1]; // cost array, horizontally
+        int _d[]; //placeholder to assist in swapping p and d
+
+        // indexes into strings s and t
+        int i; // iterates through s
+        int j; // iterates through t
+
+        char t_j; // jth character of t
+
+        int cost; // cost
+
+        for (i = 0; i <= n; i++) {
+            p[i] = i;
+        }
+
+        for (j = 1; j <= m; j++) {
+            t_j = t.charAt(j - 1);
+            d[0] = j;
+
+            for (i = 1; i <= n; i++) {
+                cost = s.charAt(i - 1) == t_j ? 0 : 1;
+                // minimum of cell to the left+1, to the top+1, diagonally left and up +cost
+                d[i] = Math.min(Math.min(d[i - 1] + 1, p[i] + 1), p[i - 1] + cost);
+            }
+
+            // copy current distance counts to 'previous row' distance counts
+            _d = p;
+            p = d;
+            d = _d;
+        }
+
+        // our last action in the above loop was to switch d and p, so p now
+        // actually has the most recent cost counts
+        return p[n];
     }
 }
