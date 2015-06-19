@@ -60,7 +60,7 @@ public class RequireJSTest {
         Map<String, ObjectNode> jsonNoCdn = RequireJS.getSetupJson(WEBJAR_URL_PREFIX);
 
         assertEquals(WEBJAR_URL_PREFIX + "angular-bootstrap/0.13.0/ui-bootstrap-tpls", jsonNoCdn.get("angular-bootstrap").get("paths").get("angular-bootstrap").get(0).asText());
-        assertEquals(WEBJAR_URL_PREFIX + "angular/1.4.0-rc.2/angular", jsonNoCdn.get("angular").get("paths").get("angular").get(0).asText());
+        assertEquals(WEBJAR_URL_PREFIX + "angular/1.4.1/angular", jsonNoCdn.get("angular").get("paths").get("angular").get(0).asText());
 
         Map<String, ObjectNode> jsonWithCdn = RequireJS.getSetupJson(WEBJAR_CDN_PREFIX, WEBJAR_URL_PREFIX);
 
