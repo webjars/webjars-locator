@@ -14,6 +14,8 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 import org.w3c.dom.Node;
 
+import org.apache.commons.lang3.StringUtils;
+
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -480,7 +482,7 @@ public final class RequireJS {
                 if (distanceMap.containsKey(value)) {
                     distance = distanceMap.get(value);
                 } else {
-                    distance = getLevenshteinDistance(nameForComparisons, value);
+                    distance = StringUtils.getLevenshteinDistance(nameForComparisons, value);
                     distanceMap.put(value, distance);
                 }
                 return distance;
@@ -617,71 +619,4 @@ public final class RequireJS {
         return webJarConfig;
     }
 
-    /*
-     * Levenshtein distance algorithm
-     * https://git-wip-us.apache.org/repos/asf?p=commons-lang.git;a=blob_plain;f=src/main/java/org/apache/commons/lang3/StringUtils.java;hb=HEAD
-     *
-     * Implementation taken from Apache Commons / Apache License 2.0
-     * http://www.apache.org/licenses/LICENSE-2.0
-     */
-
-    public static int getLevenshteinDistance(CharSequence s, CharSequence t) {
-        if (s == null || t == null) {
-            throw new IllegalArgumentException("Strings must not be null");
-        }
-
-        int n = s.length(); // length of s
-        int m = t.length(); // length of t
-
-        if (n == 0) {
-            return m;
-        } else if (m == 0) {
-            return n;
-        }
-
-        if (n > m) {
-            // swap the input strings to consume less memory
-            final CharSequence tmp = s;
-            s = t;
-            t = tmp;
-            n = m;
-            m = t.length();
-        }
-
-        int p[] = new int[n + 1]; //'previous' cost array, horizontally
-        int d[] = new int[n + 1]; // cost array, horizontally
-        int _d[]; //placeholder to assist in swapping p and d
-
-        // indexes into strings s and t
-        int i; // iterates through s
-        int j; // iterates through t
-
-        char t_j; // jth character of t
-
-        int cost; // cost
-
-        for (i = 0; i <= n; i++) {
-            p[i] = i;
-        }
-
-        for (j = 1; j <= m; j++) {
-            t_j = t.charAt(j - 1);
-            d[0] = j;
-
-            for (i = 1; i <= n; i++) {
-                cost = s.charAt(i - 1) == t_j ? 0 : 1;
-                // minimum of cell to the left+1, to the top+1, diagonally left and up +cost
-                d[i] = Math.min(Math.min(d[i - 1] + 1, p[i] + 1), p[i - 1] + cost);
-            }
-
-            // copy current distance counts to 'previous row' distance counts
-            _d = p;
-            p = d;
-            d = _d;
-        }
-
-        // our last action in the above loop was to switch d and p, so p now
-        // actually has the most recent cost counts
-        return p[n];
-    }
 }
