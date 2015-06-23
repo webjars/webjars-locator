@@ -11,7 +11,7 @@
     <packaging>jar</packaging>
     <groupId>org.webjars</groupId>
     <artifactId>webjars-locator</artifactId>
-    <version>0.25-2-SNAPSHOT</version>
+    <version>0.26-SNAPSHOT</version>
     <name>webjars-locator</name>
     <description>WebJar Locator</description>
     <url>http://webjars.org</url>
