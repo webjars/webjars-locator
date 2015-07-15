@@ -122,7 +122,7 @@ public final class RequireJS {
                 // default to the new pom.xml meta-data way
                 ObjectNode webJarObjectNode = getWebJarSetupJson(webJar, prefixesWithVersion);
                 if ((webJarObjectNode != null ? webJarObjectNode.size() : 0) != 0) {
-                    webJarConfigsString.append("\n").append("requirejs.config(").append(webJarObjectNode.toString()).append(")");
+                    webJarConfigsString.append("\n").append("requirejs.config(").append(webJarObjectNode.toString()).append(");");
                 } else {
                     webJarConfigsString.append("\n").append(getWebJarConfig(webJar));
                 }
@@ -161,7 +161,7 @@ public final class RequireJS {
                 "                        name = name.replace('.js', '');\n" +
                 "                    }\n" +
                 "                    console.error('The webjars plugin loader (e.g. webjars!' + name + ') has been deprecated.  The RequireJS config in the ' + name + ' WebJar may need to be updated.  Please file an issue: http://github.com/webjars/webjars/issues/new');\n" +
-                "                    req([name], function() {;\n" +
+                "                    req([name], function() {\n" +
                 "                        onload();\n" +
                 "                    });\n" +
                 "                }\n" +
@@ -171,7 +171,7 @@ public final class RequireJS {
                 "        // All of the WebJar configs\n\n" +
                 webJarConfigsString +
                 "    }\n" +
-                "}";
+                "};";
     }
 
     /**
