@@ -406,10 +406,11 @@ public final class RequireJS {
                 JsonNode jsonNode = mapper.readTree(inputStream);
 
                 String name = jsonNode.get("name").asText();
+                String requireFriendlyName = name.replaceAll("\\.", "-");
 
                 if (jsonNode.get("main").getNodeType() == JsonNodeType.STRING) {
                     String main = jsonNode.get("main").asText();
-                    requireConfigPaths.put(name, mainJsToPathJson(webJar, main, prefixes));
+                    requireConfigPaths.put(requireFriendlyName, mainJsToPathJson(webJar, main, prefixes));
                 }
                 else if (jsonNode.get("main").getNodeType() == JsonNodeType.ARRAY) {
                     ArrayList<String> mainList = new ArrayList<>();
@@ -417,7 +418,7 @@ public final class RequireJS {
                         mainList.add(mainJsonNode.asText());
                     }
                     String main = getBowerBestMatchFromMainArray(mainList, name);
-                    requireConfigPaths.put(name, mainJsToPathJson(webJar, main, prefixes));
+                    requireConfigPaths.put(requireFriendlyName, mainJsToPathJson(webJar, main, prefixes));
                 }
 
                 // todo add dependency shims
