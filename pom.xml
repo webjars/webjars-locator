@@ -117,6 +117,11 @@
             <groupId>org.webjars.npm</groupId>
             <artifactId>validate.js</artifactId>
             <version>0.8.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.webjars.npm</groupId>
+            <artifactId>babel-runtime</artifactId>
+            <version>5.8.19</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
