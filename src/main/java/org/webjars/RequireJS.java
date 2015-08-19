@@ -425,10 +425,6 @@ public final class RequireJS {
 
                 return requireConfig;
 
-            } catch (JsonProcessingException e) {
-                e.printStackTrace();
-                log.warn("Could not create the RequireJS config for the " + webJar.getKey() + " " + webJar.getValue() + " WebJar" + " from " + path + "\n" +
-                        "Please file a bug at: http://github.com/webjars/webjars-locator/issues/new");
             } catch (IOException e) {
                 e.printStackTrace();
                 log.warn("Could not create the RequireJS config for the " + webJar.getKey() + " " + webJar.getValue() + " WebJar" + " from " + path + "\n" +
@@ -557,11 +553,7 @@ public final class RequireJS {
                     }
                 }
 
-            } catch (ParserConfigurationException e) {
-                log.warn(requireJsConfigErrorMessage(webJar));
-            } catch (IOException e) {
-                log.warn(requireJsConfigErrorMessage(webJar));
-            } catch (SAXException e) {
+            } catch (ParserConfigurationException | IOException | SAXException e) {
                 log.warn(requireJsConfigErrorMessage(webJar));
             } finally {
                 try {
