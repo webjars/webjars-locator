@@ -430,13 +430,13 @@ public final class RequireJS {
                 return requireConfig;
 
             } catch (IOException e) {
-                e.printStackTrace();
                 log.warn("Could not create the RequireJS config for the " + webJar.getKey() + " " + webJar.getValue() + " WebJar" + " from " + path + "\n" +
+                        "Error: " +  e.getMessage() + "\n" +
                         "Please file a bug at: http://github.com/webjars/webjars-locator/issues/new");
             } catch (IllegalArgumentException e) {
-                e.printStackTrace();
                 log.warn("Could not create the RequireJS config for the " + webJar.getKey() + " " + webJar.getValue() + " WebJar" + " from " + path + "\n" +
                         "There was not enough information in the package metadata to do so.\n" +
+                        "Error: " +  e.getMessage() + "\n" +
                         "If you think you have received this message in error, " +
                         "please file a bug at: http://github.com/webjars/webjars-locator/issues/new");
             } finally {
