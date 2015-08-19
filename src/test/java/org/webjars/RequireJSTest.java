@@ -101,4 +101,10 @@ public class RequireJSTest {
         assertEquals(WEBJAR_URL_PREFIX + "validate.js/0.8.0/validate", jsonNoCdn.get("validate.js").get("paths").get("validate-js").get(0).asText());
     }
 
+    @Test
+    public void should_be_empty_if_no_main() {
+        Map<String, ObjectNode> json = RequireJS.getSetupJson(WEBJAR_URL_PREFIX);
+        assertNull(json.get("babel-runtime"));
+    }
+
 }
