@@ -408,13 +408,17 @@ public final class RequireJS {
                 String name = jsonNode.get("name").asText();
                 String requireFriendlyName = name.replaceAll("\\.", "-");
 
-                if (jsonNode.get("main").getNodeType() == JsonNodeType.STRING) {
-                    String main = jsonNode.get("main").asText();
+                JsonNode mainJs = jsonNode.get("main");
+                if (mainJs == null)
+                    throw new IllegalArgumentException("no 'main' attribute; cannot generate a config");
+
+                if (mainJs.getNodeType() == JsonNodeType.STRING) {
+                    String main = mainJs.asText();
                     requireConfigPaths.put(requireFriendlyName, mainJsToPathJson(webJar, main, prefixes));
                 }
-                else if (jsonNode.get("main").getNodeType() == JsonNodeType.ARRAY) {
+                else if (mainJs.getNodeType() == JsonNodeType.ARRAY) {
                     ArrayList<String> mainList = new ArrayList<>();
-                    for (JsonNode mainJsonNode : jsonNode.withArray("main")) {
+                    for (JsonNode mainJsonNode : mainJs) {
                         mainList.add(mainJsonNode.asText());
                     }
                     String main = getBowerBestMatchFromMainArray(mainList, name);
@@ -429,6 +433,12 @@ public final class RequireJS {
                 e.printStackTrace();
                 log.warn("Could not create the RequireJS config for the " + webJar.getKey() + " " + webJar.getValue() + " WebJar" + " from " + path + "\n" +
                         "Please file a bug at: http://github.com/webjars/webjars-locator/issues/new");
+            } catch (IllegalArgumentException e) {
+                e.printStackTrace();
+                log.warn("Could not create the RequireJS config for the " + webJar.getKey() + " " + webJar.getValue() + " WebJar" + " from " + path + "\n" +
+                        "There was not enough information in the package metadata to do so.\n" +
+                        "If you think you have received this message in error, " +
+                        "please file a bug at: http://github.com/webjars/webjars-locator/issues/new");
             } finally {
                 try {
                     inputStream.close();
