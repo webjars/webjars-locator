@@ -23,6 +23,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.file.Paths;
 import java.util.*;
 
 public final class RequireJS {
@@ -409,20 +410,23 @@ public final class RequireJS {
                 String requireFriendlyName = name.replaceAll("\\.", "-");
 
                 JsonNode mainJs = jsonNode.get("main");
-                if (mainJs == null)
-                    throw new IllegalArgumentException("no 'main' attribute; cannot generate a config");
-
-                if (mainJs.getNodeType() == JsonNodeType.STRING) {
-                    String main = mainJs.asText();
-                    requireConfigPaths.put(requireFriendlyName, mainJsToPathJson(webJar, main, prefixes));
-                }
-                else if (mainJs.getNodeType() == JsonNodeType.ARRAY) {
-                    ArrayList<String> mainList = new ArrayList<>();
-                    for (JsonNode mainJsonNode : mainJs) {
-                        mainList.add(mainJsonNode.asText());
+                if (mainJs != null) {
+                    if (mainJs.getNodeType() == JsonNodeType.STRING) {
+                        String main = mainJs.asText();
+                        requireConfigPaths.put(requireFriendlyName, mainJsToPathJson(webJar, main, prefixes));
+                    } else if (mainJs.getNodeType() == JsonNodeType.ARRAY) {
+                        ArrayList<String> mainList = new ArrayList<>();
+                        for (JsonNode mainJsonNode : mainJs) {
+                            mainList.add(mainJsonNode.asText());
+                        }
+                        String main = getBowerBestMatchFromMainArray(mainList, name);
+                        requireConfigPaths.put(requireFriendlyName, mainJsToPathJson(webJar, main, prefixes));
                     }
-                    String main = getBowerBestMatchFromMainArray(mainList, name);
-                    requireConfigPaths.put(requireFriendlyName, mainJsToPathJson(webJar, main, prefixes));
+                } else {
+                    if (hasIndexFile(WebJarAssetLocator.WEBJARS_PATH_PREFIX + "/" + webJar.getKey() + "/" + webJar.getValue() + "/index.js"))
+                        requireConfigPaths.put(requireFriendlyName, mainJsToPathJson(webJar, "index.js", prefixes));
+                    else
+                        throw new IllegalArgumentException("no 'main' nor 'index.js' file; cannot generate a config");
                 }
 
                 // todo add dependency shims
@@ -450,6 +454,18 @@ public final class RequireJS {
         }
 
         return null;
+    }
+
+    private static boolean hasIndexFile(String path) {
+        InputStream resourceAsStream = RequireJS.class.getClassLoader().getResourceAsStream(path);
+        try {
+            return resourceAsStream != null;
+        } finally {
+            if (resourceAsStream != null) try {
+                resourceAsStream.close();
+            } catch (IOException e) {
+            }
+        }
     }
 
     /*
