@@ -62,7 +62,7 @@ public class RequireJSTest {
         // todo: the angular version changes due to a range transitive dependency
 
         assertEquals(WEBJAR_URL_PREFIX + "angular-bootstrap/0.13.0/ui-bootstrap-tpls", jsonNoCdn.get("angular-bootstrap").get("paths").get("angular-bootstrap").get(0).asText());
-        assertEquals(WEBJAR_URL_PREFIX + "angular/1.5.5/angular", jsonNoCdn.get("angular").get("paths").get("angular").get(0).asText());
+        assertEquals(WEBJAR_URL_PREFIX + "angular/1.5.7/angular", jsonNoCdn.get("angular").get("paths").get("angular").get(0).asText());
 
         Map<String, ObjectNode> jsonWithCdn = RequireJS.getSetupJson(WEBJAR_CDN_PREFIX, WEBJAR_URL_PREFIX);
 
@@ -102,9 +102,15 @@ public class RequireJSTest {
     }
 
     @Test
-    public void should_be_empty_if_no_main() {
+    public void should_be_empty_if_no_main_nor_index_file() {
         Map<String, ObjectNode> json = RequireJS.getSetupJson(WEBJAR_URL_PREFIX);
         assertNull(json.get("babel-runtime"));
+    }
+
+    @Test
+    public void should_be_ok_with_index_file_but_no_main() {
+        Map<String, ObjectNode> json = RequireJS.getSetupJson(WEBJAR_URL_PREFIX);
+        assertEquals(WEBJAR_URL_PREFIX + "object-assign/4.1.0/index", json.get("object-assign").get("paths").get("object-assign").get(0).asText());
     }
 
 }
