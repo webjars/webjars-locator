@@ -1,20 +1,15 @@
 package org.webjars;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.*;
-
-import static com.fasterxml.jackson.core.JsonParser.Feature.ALLOW_UNQUOTED_FIELD_NAMES;
-import static com.fasterxml.jackson.core.JsonParser.Feature.ALLOW_SINGLE_QUOTES;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
+import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
-import org.w3c.dom.Node;
-
-import org.apache.commons.lang3.StringUtils;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -23,8 +18,10 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.nio.file.Paths;
 import java.util.*;
+
+import static com.fasterxml.jackson.core.JsonParser.Feature.ALLOW_SINGLE_QUOTES;
+import static com.fasterxml.jackson.core.JsonParser.Feature.ALLOW_UNQUOTED_FIELD_NAMES;
 
 public final class RequireJS {
 
@@ -47,7 +44,7 @@ public final class RequireJS {
      */
     public synchronized static String getSetupJavaScript(String urlPrefix) {
         if (requireConfigJavaScript == null) {
-            List<String> prefixes = new ArrayList<String>();
+            List<String> prefixes = new ArrayList<>();
             prefixes.add(urlPrefix);
 
             requireConfigJavaScript = generateSetupJavaScript(prefixes);
@@ -65,7 +62,7 @@ public final class RequireJS {
      */
     public synchronized static String getSetupJavaScript(String cdnPrefix, String urlPrefix) {
         if (requireConfigJavaScriptCdn == null) {
-            List<String> prefixes = new ArrayList<String>();
+            List<String> prefixes = new ArrayList<>();
             prefixes.add(cdnPrefix);
             prefixes.add(urlPrefix);
 
@@ -99,9 +96,9 @@ public final class RequireJS {
     @Deprecated
     public static String generateSetupJavaScript(List<String> prefixes, Map<String, String> webJars) {
 
-        List<Map.Entry<String, Boolean>> prefixesWithVersion = new ArrayList<Map.Entry<String, Boolean>>();
+        List<Map.Entry<String, Boolean>> prefixesWithVersion = new ArrayList<>();
         for (String prefix : prefixes) {
-            prefixesWithVersion.add(new AbstractMap.SimpleEntry<String, Boolean>(prefix, true));
+            prefixesWithVersion.add(new AbstractMap.SimpleEntry<>(prefix, true));
         }
 
         ObjectMapper mapper = new ObjectMapper();
@@ -185,8 +182,8 @@ public final class RequireJS {
     public synchronized static Map<String, ObjectNode> getSetupJson(String urlPrefix) {
         if (requireConfigJson == null) {
 
-            List<Map.Entry<String, Boolean>> prefixes = new ArrayList<Map.Entry<String, Boolean>>();
-            prefixes.add(new AbstractMap.SimpleEntry<String, Boolean>(urlPrefix, true));
+            List<Map.Entry<String, Boolean>> prefixes = new ArrayList<>();
+            prefixes.add(new AbstractMap.SimpleEntry<>(urlPrefix, true));
 
             requireConfigJson = generateSetupJson(prefixes);
         }
@@ -204,9 +201,9 @@ public final class RequireJS {
     public synchronized static Map<String, ObjectNode> getSetupJson(String cdnPrefix, String urlPrefix) {
         if (requireConfigJsonCdn == null) {
 
-            List<Map.Entry<String, Boolean>> prefixes = new ArrayList<Map.Entry<String, Boolean>>();
-            prefixes.add(new AbstractMap.SimpleEntry<String, Boolean>(cdnPrefix, true));
-            prefixes.add(new AbstractMap.SimpleEntry<String, Boolean>(urlPrefix, true));
+            List<Map.Entry<String, Boolean>> prefixes = new ArrayList<>();
+            prefixes.add(new AbstractMap.SimpleEntry<>(cdnPrefix, true));
+            prefixes.add(new AbstractMap.SimpleEntry<>(urlPrefix, true));
 
             requireConfigJsonCdn = generateSetupJson(prefixes);
         }
@@ -224,7 +221,7 @@ public final class RequireJS {
     public static Map<String, ObjectNode> generateSetupJson(List<Map.Entry<String, Boolean>> prefixes) {
         Map<String, String> webJars = new WebJarAssetLocator().getWebJars();
 
-        Map<String, ObjectNode> jsonConfigs = new HashMap<String, ObjectNode>();
+        Map<String, ObjectNode> jsonConfigs = new HashMap<>();
 
         for (Map.Entry<String, String> webJar : webJars.entrySet()) {
             jsonConfigs.put(webJar.getKey(), getWebJarSetupJson(webJar, prefixes));
@@ -413,18 +410,18 @@ public final class RequireJS {
                 if (mainJs != null) {
                     if (mainJs.getNodeType() == JsonNodeType.STRING) {
                         String main = mainJs.asText();
-                        requireConfigPaths.put(requireFriendlyName, mainJsToPathJson(webJar, main, prefixes));
+                        requireConfigPaths.set(requireFriendlyName, mainJsToPathJson(webJar, main, prefixes));
                     } else if (mainJs.getNodeType() == JsonNodeType.ARRAY) {
                         ArrayList<String> mainList = new ArrayList<>();
                         for (JsonNode mainJsonNode : mainJs) {
                             mainList.add(mainJsonNode.asText());
                         }
                         String main = getBowerBestMatchFromMainArray(mainList, name);
-                        requireConfigPaths.put(requireFriendlyName, mainJsToPathJson(webJar, main, prefixes));
+                        requireConfigPaths.set(requireFriendlyName, mainJsToPathJson(webJar, main, prefixes));
                     }
                 } else {
                     if (hasIndexFile(WebJarAssetLocator.WEBJARS_PATH_PREFIX + "/" + webJar.getKey() + "/" + webJar.getValue() + "/index.js"))
-                        requireConfigPaths.put(requireFriendlyName, mainJsToPathJson(webJar, "index.js", prefixes));
+                        requireConfigPaths.set(requireFriendlyName, mainJsToPathJson(webJar, "index.js", prefixes));
                     else
                         throw new IllegalArgumentException("no 'main' nor 'index.js' file; cannot generate a config");
                 }
@@ -463,7 +460,7 @@ public final class RequireJS {
         } finally {
             if (resourceAsStream != null) try {
                 resourceAsStream.close();
-            } catch (IOException e) {
+            } catch (IOException ignored) {
             }
         }
     }
@@ -499,7 +496,7 @@ public final class RequireJS {
 
         Collections.sort(filteredList, new Comparator<String>() {
 
-            public Integer getDistance(String value) {
+            Integer getDistance(String value) {
                 int distance;
                 value = value.toLowerCase();
                 if (distanceMap.containsKey(value)) {
