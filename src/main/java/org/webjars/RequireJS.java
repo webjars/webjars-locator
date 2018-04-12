@@ -267,7 +267,7 @@ public final class RequireJS {
 
         try {
             JsonNode maybeRequireJsConfig = mapper.readTree(rawRequireJsConfig);
-            if (maybeRequireJsConfig.isObject()) {
+            if (maybeRequireJsConfig != null && maybeRequireJsConfig.isObject()) {
                 // The provided config was parseable, now lets fix the paths
 
                 webJarRequireJsNode = (ObjectNode) maybeRequireJsConfig;
@@ -347,7 +347,11 @@ public final class RequireJS {
                 }
 
             } else {
-                log.error(requireJsConfigErrorMessage(webJar));
+                if (rawRequireJsConfig.length() > 0) {
+                    log.error(requireJsConfigErrorMessage(webJar));
+                } else {
+                    log.warn(requireJsConfigErrorMessage(webJar));
+                }
             }
         } catch (IOException e) {
             log.warn(requireJsConfigErrorMessage(webJar));
