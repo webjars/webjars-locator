@@ -5,6 +5,7 @@ import org.junit.Test;
 
 import java.util.AbstractMap;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -111,6 +112,12 @@ public class RequireJSTest {
     public void should_be_ok_with_index_file_but_no_main() {
         Map<String, ObjectNode> json = RequireJS.getSetupJson(WEBJAR_URL_PREFIX);
         assertEquals(WEBJAR_URL_PREFIX + "object-assign/4.1.0/index", json.get("object-assign").get("paths").get("object-assign").get(0).asText());
+    }
+
+    @Test
+    public void should_load_webjar_without_requirejs_properties() {
+        ObjectNode objectNode = RequireJS.getWebJarRequireJsConfig(new AbstractMap.SimpleEntry<>("bootswatch", "2.3.1"), Collections.<Map.Entry<String, Boolean>>emptyList());
+        assertEquals(0, objectNode.size());
     }
 
 }
