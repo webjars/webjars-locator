@@ -63,7 +63,7 @@ public class RequireJSTest {
         // todo: the angular version changes due to a range transitive dependency
 
         assertEquals(WEBJAR_URL_PREFIX + "angular-bootstrap/0.13.0/ui-bootstrap-tpls", jsonNoCdn.get("angular-bootstrap").get("paths").get("angular-bootstrap").get(0).asText());
-        assertEquals(WEBJAR_URL_PREFIX + "angular/1.7.8/angular", jsonNoCdn.get("angular").get("paths").get("angular").get(0).asText());
+        assertEquals(WEBJAR_URL_PREFIX + "angular/1.8.0/angular", jsonNoCdn.get("angular").get("paths").get("angular").get(0).asText());
 
         Map<String, ObjectNode> jsonWithCdn = RequireJS.getSetupJson(WEBJAR_CDN_PREFIX, WEBJAR_URL_PREFIX);
 
