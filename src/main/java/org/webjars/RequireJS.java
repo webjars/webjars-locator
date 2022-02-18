@@ -1,8 +1,41 @@
 package org.webjars;
 
+import static com.fasterxml.jackson.core.JsonParser.Feature.ALLOW_SINGLE_QUOTES;
+import static com.fasterxml.jackson.core.JsonParser.Feature.ALLOW_UNQUOTED_FIELD_NAMES;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.*;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.JsonNodeType;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
+import com.github.mustachejava.DefaultMustacheFactory;
+import com.github.mustachejava.Mustache;
+import com.github.mustachejava.MustacheFactory;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
+import java.util.AbstractMap.SimpleEntry;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,23 +44,12 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.util.*;
-
-import static com.fasterxml.jackson.core.JsonParser.Feature.ALLOW_SINGLE_QUOTES;
-import static com.fasterxml.jackson.core.JsonParser.Feature.ALLOW_UNQUOTED_FIELD_NAMES;
-
 public final class RequireJS {
 
     public static final String WEBJARS_MAVEN_PREFIX = "META-INF/maven/org.webjars";
 
     private static final Logger log = LoggerFactory.getLogger(RequireJS.class);
+    private static final Pattern DOT = Pattern.compile("\\.");
 
     private static String requireConfigJavaScript;
     private static String requireConfigJavaScriptCdn;
@@ -35,212 +57,169 @@ public final class RequireJS {
     private static Map<String, ObjectNode> requireConfigJson;
     private static Map<String, ObjectNode> requireConfigJsonCdn;
 
+    private RequireJS() {
+        // utility class
+    }
+
     /**
-     * Returns the JavaScript that is used to setup the RequireJS config.
-     * This value is cached in memory so that all of the processing to get the String only has to happen once.
+     * Returns the JavaScript that is used to setup the RequireJS config. This value is cached in memory so that all of the processing to get the String only has to happen once.
      *
      * @param urlPrefix The URL prefix where the WebJars can be downloaded from with a trailing slash, e.g. /webJars/
      * @return The JavaScript block that can be embedded or loaded in a &lt;script&gt; tag
      */
-    public synchronized static String getSetupJavaScript(String urlPrefix) {
+    @Nonnull
+    public static synchronized String getSetupJavaScript(@Nullable String urlPrefix) {
         if (requireConfigJavaScript == null) {
-            List<String> prefixes = new ArrayList<>();
-            prefixes.add(urlPrefix);
-
-            requireConfigJavaScript = generateSetupJavaScript(prefixes);
+            requireConfigJavaScript = generateSetupJavaScript(Collections.singletonList(urlPrefix));
         }
         return requireConfigJavaScript;
     }
 
     /**
-     * Returns the JavaScript that is used to setup the RequireJS config.
-     * This value is cached in memory so that all of the processing to get the String only has to happen once.
+     * Returns the JavaScript that is used to setup the RequireJS config. This value is cached in memory so that all of the processing to get the String only has to happen once.
      *
      * @param urlPrefix The URL prefix where the WebJars can be downloaded from with a trailing slash, e.g. /webJars/
      * @param cdnPrefix The optional CDN prefix where the WebJars can be downloaded from
      * @return The JavaScript block that can be embedded or loaded in a &lt;script&gt; tag
      */
-    public synchronized static String getSetupJavaScript(String cdnPrefix, String urlPrefix) {
+    @Nonnull
+    public static synchronized String getSetupJavaScript(@Nullable String cdnPrefix, @Nullable String urlPrefix) {
         if (requireConfigJavaScriptCdn == null) {
-            List<String> prefixes = new ArrayList<>();
+            Collection<String> prefixes = new ArrayList<>(2);
             prefixes.add(cdnPrefix);
             prefixes.add(urlPrefix);
-
             requireConfigJavaScriptCdn = generateSetupJavaScript(prefixes);
         }
         return requireConfigJavaScriptCdn;
     }
 
     /**
-     * Returns the JavaScript that is used to setup the RequireJS config.
-     * This value is not cached.
+     * Returns the JavaScript that is used to setup the RequireJS config. This value is not cached.
      *
      * @param prefixes A list of the prefixes to use in the `paths` part of the RequireJS config.
      * @return The JavaScript block that can be embedded or loaded in a &lt;script&gt; tag.
      */
-    public static String generateSetupJavaScript(List<String> prefixes) {
+    @Nonnull
+    public static String generateSetupJavaScript(@Nonnull Collection<String> prefixes) {
         Map<String, String> webJars = new WebJarAssetLocator().getWebJars();
-
         return generateSetupJavaScript(prefixes, webJars);
     }
 
     /**
-     * Generate the JavaScript that is used to setup the RequireJS config.
-     * This value is not cached.
-     * This uses nasty stuff that is really not maintainable or testable.  So this has been deprecated and the implementation will eventually be replaced with something better.
+     * Generate the JavaScript that is used to setup the RequireJS config. This value is not cached.
      *
      * @param prefixes A list of the prefixes to use in the `paths` part of the RequireJS config.
      * @param webJars  The WebJars (artifactId -&gt; version) to use
      * @return The JavaScript block that can be embedded or loaded in a &lt;script&gt; tag.
      */
-    @Deprecated
-    public static String generateSetupJavaScript(List<String> prefixes, Map<String, String> webJars) {
+    @Nonnull
+    public static String generateSetupJavaScript(@Nonnull Collection<String> prefixes, @Nonnull Map<String, String> webJars) {
 
-        List<Map.Entry<String, Boolean>> prefixesWithVersion = new ArrayList<>();
-        for (String prefix : prefixes) {
-            prefixesWithVersion.add(new AbstractMap.SimpleEntry<>(prefix, true));
-        }
+        List<Entry<String, Boolean>> prefixesWithVersion =
+            prefixes.stream()
+                .map(prefix -> new SimpleEntry<>(prefix, true))
+                .collect(Collectors.toList());
 
-        ObjectMapper mapper = new ObjectMapper();
-
-        ObjectNode webJarsVersions = mapper.createObjectNode();
-
+        Collection<WebJarVersion> versions = new ArrayList<>(webJars.size());
         StringBuilder webJarConfigsString = new StringBuilder();
+        Collection<String> requireJsConfigs = new ArrayList<>(webJars.size());
 
         if (webJars.isEmpty()) {
             log.warn("Can't find any WebJars in the classpath, RequireJS configuration will be empty.");
         } else {
-            for (Map.Entry<String, String> webJar : webJars.entrySet()) {
-
-                // assemble the WebJar versions string
-                webJarsVersions.put(webJar.getKey(), webJar.getValue());
+            for (Entry<String, String> webJar : webJars.entrySet()) {
+                versions.add(new WebJarVersion(webJar.getKey(), webJar.getValue()));
 
                 // assemble the WebJar config string
 
                 // default to the new pom.xml meta-data way
                 ObjectNode webJarObjectNode = getWebJarSetupJson(webJar, prefixesWithVersion);
-                if ((webJarObjectNode != null ? webJarObjectNode.size() : 0) != 0) {
-                    webJarConfigsString.append("\n").append("requirejs.config(").append(webJarObjectNode.toString()).append(");");
+                if ((webJarObjectNode != null ? webJarObjectNode.size() : 0) == 0) {
+                    webJarConfigsString.append('\n').append(getWebJarConfig(webJar));
                 } else {
-                    webJarConfigsString.append("\n").append(getWebJarConfig(webJar));
+                    requireJsConfigs.add(webJarObjectNode.toString());
                 }
             }
         }
 
-        String webJarBasePath = "webJarId + '/' + webjars.versions[webJarId] + '/' + path";
-
-        StringBuilder webJarPath = new StringBuilder("[");
-
-        for (String prefix : prefixes) {
-            webJarPath.append("'").append(prefix).append("' + ").append(webJarBasePath).append(",\n");
+        Collection<WebJarPath> webJarPaths = new ArrayList<>(prefixes.size());
+        for (Iterator<String> iterator = prefixes.iterator(); iterator.hasNext(); ) {
+            String prefix = iterator.next();
+            webJarPaths.add(new WebJarPath(prefix, iterator.hasNext()));
         }
 
-        //webJarBasePath.
-        webJarPath.delete(webJarPath.lastIndexOf(",\n"), webJarPath.lastIndexOf(",\n") + 2);
-
-        webJarPath.append("]");
-
-        return "var webjars = {\n" +
-                "    versions: " + webJarsVersions.toString() + ",\n" +
-                "    path: function(webJarId, path) {\n" +
-                "        console.error('The webjars.path() method of getting a WebJar path has been deprecated.  The RequireJS config in the ' + webJarId + ' WebJar may need to be updated.  Please file an issue: http://github.com/webjars/' + webJarId + '/issues/new');\n" +
-                "        return " + webJarPath.toString() + ";\n" +
-                "    }\n" +
-                "};\n" +
-                "\n" +
-                "var require = {\n" +
-                "    callback: function() {\n" +
-                "        // Deprecated WebJars RequireJS plugin loader\n" +
-                "        define('webjars', function() {\n" +
-                "            return {\n" +
-                "                load: function(name, req, onload, config) {\n" +
-                "                    if (name.indexOf('.js') >= 0) {\n" +
-                "                        console.warn('Detected a legacy file name (' + name + ') as the thing to load.  Loading via file name is no longer supported so the .js will be dropped in an effort to resolve the module name instead.');\n" +
-                "                        name = name.replace('.js', '');\n" +
-                "                    }\n" +
-                "                    console.error('The webjars plugin loader (e.g. webjars!' + name + ') has been deprecated.  The RequireJS config in the ' + name + ' WebJar may need to be updated.  Please file an issue: http://github.com/webjars/webjars/issues/new');\n" +
-                "                    req([name], function() {\n" +
-                "                        onload();\n" +
-                "                    });\n" +
-                "                }\n" +
-                "            }\n" +
-                "        });\n" +
-                "\n" +
-                "        // All of the WebJar configs\n\n" +
-                webJarConfigsString +
-                "    }\n" +
-                "};";
+        Map<String, Object> context = new HashMap<>(5);
+        context.put("versions", versions);
+        context.put("webJarPaths", webJarPaths);
+        context.put("requireJsConfigs", requireJsConfigs);
+        context.put("webJarConfigsString", webJarConfigsString);
+        MustacheFactory mf = new DefaultMustacheFactory();
+        Mustache mustache = mf.compile("setup-template.mustache");
+        StringWriter writer = new StringWriter();
+        mustache.execute(writer, context);
+        return writer.toString();
     }
 
     /**
-     * Returns the JSON that is used to setup the RequireJS config.
-     * This value is cached in memory so that all of the processing to get the JSON only has to happen once.
+     * Returns the JSON that is used to setup the RequireJS config. This value is cached in memory so that all of the processing to get the JSON only has to happen once.
      *
      * @param urlPrefix The URL prefix where the WebJars can be downloaded from with a trailing slash, e.g. /webJars/
      * @return The JSON structured config
      */
-    public synchronized static Map<String, ObjectNode> getSetupJson(String urlPrefix) {
+    @Nonnull
+    public static synchronized Map<String, ObjectNode> getSetupJson(@Nullable String urlPrefix) {
         if (requireConfigJson == null) {
-
-            List<Map.Entry<String, Boolean>> prefixes = new ArrayList<>();
-            prefixes.add(new AbstractMap.SimpleEntry<>(urlPrefix, true));
-
-            requireConfigJson = generateSetupJson(prefixes);
+            requireConfigJson = generateSetupJson(Collections.singletonList(new SimpleEntry<>(urlPrefix, true)));
         }
         return requireConfigJson;
     }
 
     /**
-     * Returns the JSON that is used to setup the RequireJS config.
-     * This value is cached in memory so that all of the processing to get the JSON only has to happen once.
+     * Returns the JSON that is used to setup the RequireJS config. This value is cached in memory so that all of the processing to get the JSON only has to happen once.
      *
      * @param cdnPrefix The CDN prefix where the WebJars can be downloaded from
      * @param urlPrefix The URL prefix where the WebJars can be downloaded from with a trailing slash, e.g. /webJars/
      * @return The JSON structured config
      */
-    public synchronized static Map<String, ObjectNode> getSetupJson(String cdnPrefix, String urlPrefix) {
+    @Nonnull
+    public static synchronized Map<String, ObjectNode> getSetupJson(@Nullable String cdnPrefix, @Nullable String urlPrefix) {
         if (requireConfigJsonCdn == null) {
-
-            List<Map.Entry<String, Boolean>> prefixes = new ArrayList<>();
-            prefixes.add(new AbstractMap.SimpleEntry<>(cdnPrefix, true));
-            prefixes.add(new AbstractMap.SimpleEntry<>(urlPrefix, true));
-
+            List<Entry<String, Boolean>> prefixes = new ArrayList<>(2);
+            prefixes.add(new SimpleEntry<>(cdnPrefix, true));
+            prefixes.add(new SimpleEntry<>(urlPrefix, true));
             requireConfigJsonCdn = generateSetupJson(prefixes);
         }
         return requireConfigJsonCdn;
     }
 
     /**
-     * Returns the JSON used to setup the RequireJS config for each WebJar in the CLASSPATH.
-     * This value is not cached.
+     * Returns the JSON used to setup the RequireJS config for each WebJar in the CLASSPATH. This value is not cached.
      *
-     * @param prefixes A list of the prefixes to use in the `paths` part of the RequireJS config with a boolean flag
-     *                 indicating whether or not to include the version.
+     * @param prefixes A list of the prefixes to use in the `paths` part of the RequireJS config with a boolean flag indicating whether or not to include the version.
      * @return The JSON structured config for each WebJar.
      */
-    public static Map<String, ObjectNode> generateSetupJson(List<Map.Entry<String, Boolean>> prefixes) {
+    @Nonnull
+    public static Map<String, ObjectNode> generateSetupJson(@Nonnull List<Entry<String, Boolean>> prefixes) {
         Map<String, String> webJars = new WebJarAssetLocator().getWebJars();
-
-        Map<String, ObjectNode> jsonConfigs = new HashMap<>();
-
-        for (Map.Entry<String, String> webJar : webJars.entrySet()) {
+        Map<String, ObjectNode> jsonConfigs = new HashMap<>(webJars.size());
+        for (Entry<String, String> webJar : webJars.entrySet()) {
             jsonConfigs.put(webJar.getKey(), getWebJarSetupJson(webJar, prefixes));
         }
-
         return jsonConfigs;
     }
 
-    private static ObjectNode getWebJarSetupJson(Map.Entry<String, String> webJar, List<Map.Entry<String, Boolean>> prefixes) {
+    @Nullable
+    private static ObjectNode getWebJarSetupJson(@Nonnull Entry<String, String> webJar, @Nonnull List<Entry<String, Boolean>> prefixes) {
 
         if (RequireJS.class.getClassLoader().getResource("META-INF/maven/org.webjars.npm/" + webJar.getKey() + "/pom.xml") != null) {
             // create the requirejs config from the package.json
             return getNpmWebJarRequireJsConfig(webJar, prefixes);
         }
-        else if (RequireJS.class.getClassLoader().getResource("META-INF/maven/org.webjars.bower/" + webJar.getKey() + "/pom.xml") != null) {
+        if (RequireJS.class.getClassLoader().getResource("META-INF/maven/org.webjars.bower/" + webJar.getKey() + "/pom.xml") != null) {
             // create the requirejs config from the bower.json
             return getBowerWebJarRequireJsConfig(webJar, prefixes);
         }
-        else if (RequireJS.class.getClassLoader().getResource("META-INF/maven/org.webjars/" + webJar.getKey() + "/pom.xml") != null) {
+        if (RequireJS.class.getClassLoader().getResource("META-INF/maven/org.webjars/" + webJar.getKey() + "/pom.xml") != null) {
             // get the requirejs config from the pom
             return getWebJarRequireJsConfig(webJar, prefixes);
         }
@@ -255,7 +234,7 @@ public final class RequireJS {
      * @param prefixes A list of the prefixes to use in the `paths` part of the RequireJS config.
      * @return The JSON RequireJS config for the WebJar based on the meta-data in the WebJar's pom.xml file.
      */
-    public static ObjectNode getWebJarRequireJsConfig(Map.Entry<String, String> webJar, List<Map.Entry<String, Boolean>> prefixes) {
+    public static ObjectNode getWebJarRequireJsConfig(Entry<String, String> webJar, List<Entry<String, Boolean>> prefixes) {
         String rawRequireJsConfig = getRawWebJarRequireJsConfig(webJar);
 
         ObjectMapper mapper = new ObjectMapper()
@@ -272,7 +251,6 @@ public final class RequireJS {
 
                 webJarRequireJsNode = (ObjectNode) maybeRequireJsConfig;
 
-
                 if (webJarRequireJsNode.isObject()) {
 
                     // update the paths
@@ -282,9 +260,9 @@ public final class RequireJS {
                     ObjectNode newPaths = mapper.createObjectNode();
 
                     if (pathsNode != null) {
-                        Iterator<Map.Entry<String, JsonNode>> paths = pathsNode.fields();
+                        Iterator<Entry<String, JsonNode>> paths = pathsNode.fields();
                         while (paths.hasNext()) {
-                            Map.Entry<String, JsonNode> pathNode = paths.next();
+                            Entry<String, JsonNode> pathNode = paths.next();
 
                             String originalPath = null;
 
@@ -299,23 +277,21 @@ public final class RequireJS {
 
                             if (originalPath != null) {
                                 ArrayNode newPathsNode = newPaths.putArray(pathNode.getKey());
-                                for (Map.Entry<String, Boolean> prefix : prefixes) {
-                                    String newPath = prefix.getKey() + webJar.getKey();
+                                for (Entry<String, Boolean> prefix : prefixes) {
+                                    StringBuilder newPath = new StringBuilder(prefix.getKey()).append(webJar.getKey());
                                     if (prefix.getValue()) {
-                                        newPath += "/" + webJar.getValue();
+                                        newPath.append('/').append(webJar.getValue());
                                     }
-                                    newPath += "/" + originalPath;
-                                    newPathsNode.add(newPath);
+                                    newPathsNode.add(newPath.append('/').append(originalPath).toString());
                                 }
                                 newPathsNode.add(originalPath);
                             } else {
-                                log.error("Strange... The path could not be parsed.  Here is what was provided: " + pathNode.getValue().toString());
+                                log.error("Strange... The path could not be parsed.  Here is what was provided: {}", pathNode.getValue().toString());
                             }
                         }
                     }
 
                     webJarRequireJsNode.replace("paths", newPaths);
-
 
                     // update the location in the packages node
                     ArrayNode packagesNode = webJarRequireJsNode.withArray("packages");
@@ -325,18 +301,16 @@ public final class RequireJS {
                     if (packagesNode != null) {
                         for (JsonNode packageJson : packagesNode) {
                             String originalLocation = packageJson.get("location").textValue();
-                            if (prefixes.size() > 0) {
+                            if (!prefixes.isEmpty()) {
                                 // this picks the last prefix assuming that it is the right one
                                 // not sure of a better way to do this since I don't think we want the CDN prefix
                                 // maybe this can be an array like paths?
-                                Map.Entry<String, Boolean> prefix = prefixes.get(prefixes.size() - 1);
-                                String newLocation = prefix.getKey() + webJar.getKey();
+                                Entry<String, Boolean> prefix = prefixes.get(prefixes.size() - 1);
+                                StringBuilder newLocation = new StringBuilder(prefix.getKey()).append(webJar.getKey());
                                 if (prefix.getValue()) {
-                                    newLocation += "/" + webJar.getValue();
+                                    newLocation.append('/').append(webJar.getValue());
                                 }
-                                newLocation += "/" + originalLocation;
-
-                                ((ObjectNode) packageJson).put("location", newLocation);
+                                ((ObjectNode) packageJson).put("location", newLocation.append('/').append(originalLocation).toString());
                             }
 
                             newPackages.add(packageJson);
@@ -347,15 +321,15 @@ public final class RequireJS {
                 }
 
             } else {
-                if (rawRequireJsConfig.length() > 0) {
-                    log.error(requireJsConfigErrorMessage(webJar));
-                } else {
+                if (rawRequireJsConfig.isEmpty()) {
                     log.warn(requireJsConfigErrorMessage(webJar));
+                } else {
+                    log.error(requireJsConfigErrorMessage(webJar));
                 }
             }
         } catch (IOException e) {
             log.warn(requireJsConfigErrorMessage(webJar));
-            if (rawRequireJsConfig.length() > 0) {
+            if (!rawRequireJsConfig.isEmpty()) {
                 // only show the error if there was a config to parse
                 log.error(e.getMessage());
             }
@@ -372,9 +346,9 @@ public final class RequireJS {
      * @param prefixes A list of the prefixes to use in the `paths` part of the RequireJS config.
      * @return The JSON RequireJS config for the WebJar based on the meta-data in the WebJar's pom.xml file.
      */
-    public static ObjectNode getBowerWebJarRequireJsConfig(Map.Entry<String, String> webJar, List<Map.Entry<String, Boolean>> prefixes) {
+    public static ObjectNode getBowerWebJarRequireJsConfig(Entry<String, String> webJar, List<Entry<String, Boolean>> prefixes) {
 
-        String bowerJsonPath = WebJarAssetLocator.WEBJARS_PATH_PREFIX + "/" + webJar.getKey() + "/" + webJar.getValue() + "/" + "bower.json";
+        String bowerJsonPath = String.format("%s/%s/%s/bower.json", WebJarAssetLocator.WEBJARS_PATH_PREFIX, webJar.getKey(), webJar.getValue());
 
         return getWebJarRequireJsConfigFromMainConfig(webJar, prefixes, bowerJsonPath);
     }
@@ -386,21 +360,22 @@ public final class RequireJS {
      * @param prefixes A list of the prefixes to use in the `paths` part of the RequireJS config.
      * @return The JSON RequireJS config for the WebJar based on the meta-data in the WebJar's pom.xml file.
      */
-    public static ObjectNode getNpmWebJarRequireJsConfig(Map.Entry<String, String> webJar, List<Map.Entry<String, Boolean>> prefixes) {
+    public static ObjectNode getNpmWebJarRequireJsConfig(Entry<String, String> webJar, List<Entry<String, Boolean>> prefixes) {
 
-        String packageJsonPath = WebJarAssetLocator.WEBJARS_PATH_PREFIX + "/" + webJar.getKey() + "/" + webJar.getValue() + "/" + "package.json";
+        String packageJsonPath = String.format("%s/%s/%s/package.json", WebJarAssetLocator.WEBJARS_PATH_PREFIX, webJar.getKey(), webJar.getValue());
 
         return getWebJarRequireJsConfigFromMainConfig(webJar, prefixes, packageJsonPath);
     }
 
-    private static ObjectNode getWebJarRequireJsConfigFromMainConfig(Map.Entry<String, String> webJar, List<Map.Entry<String, Boolean>> prefixes, String path) {
+    @Nullable
+    private static ObjectNode getWebJarRequireJsConfigFromMainConfig(Entry<String, String> webJar, List<Entry<String, Boolean>> prefixes, String path) {
         InputStream inputStream = RequireJS.class.getClassLoader().getResourceAsStream(path);
 
         if (inputStream != null) {
             try {
                 ObjectMapper mapper = new ObjectMapper()
-                        .configure(ALLOW_UNQUOTED_FIELD_NAMES, true)
-                        .configure(ALLOW_SINGLE_QUOTES, true);
+                    .configure(ALLOW_UNQUOTED_FIELD_NAMES, true)
+                    .configure(ALLOW_SINGLE_QUOTES, true);
 
                 ObjectNode requireConfig = mapper.createObjectNode();
                 ObjectNode requireConfigPaths = requireConfig.putObject("paths");
@@ -408,7 +383,7 @@ public final class RequireJS {
                 JsonNode jsonNode = mapper.readTree(inputStream);
 
                 String name = jsonNode.get("name").asText();
-                String requireFriendlyName = name.replaceAll("\\.", "-");
+                String requireFriendlyName = DOT.matcher(name).replaceAll("-");
 
                 JsonNode mainJs = jsonNode.get("main");
                 if (mainJs != null) {
@@ -416,7 +391,7 @@ public final class RequireJS {
                         String main = mainJs.asText();
                         requireConfigPaths.set(requireFriendlyName, mainJsToPathJson(webJar, main, prefixes));
                     } else if (mainJs.getNodeType() == JsonNodeType.ARRAY) {
-                        ArrayList<String> mainList = new ArrayList<>();
+                        ArrayList<String> mainList = new ArrayList<>(mainJs.size());
                         for (JsonNode mainJsonNode : mainJs) {
                             mainList.add(mainJsonNode.asText());
                         }
@@ -424,10 +399,11 @@ public final class RequireJS {
                         requireConfigPaths.set(requireFriendlyName, mainJsToPathJson(webJar, main, prefixes));
                     }
                 } else {
-                    if (hasIndexFile(WebJarAssetLocator.WEBJARS_PATH_PREFIX + "/" + webJar.getKey() + "/" + webJar.getValue() + "/index.js"))
+                    if (hasIndexFile(String.format("%s/%s/%s/index.js", WebJarAssetLocator.WEBJARS_PATH_PREFIX, webJar.getKey(), webJar.getValue()))) {
                         requireConfigPaths.set(requireFriendlyName, mainJsToPathJson(webJar, "index.js", prefixes));
-                    else
+                    } else {
                         throw new IllegalArgumentException("no 'main' nor 'index.js' file; cannot generate a config");
+                    }
                 }
 
                 // todo add dependency shims
@@ -435,15 +411,13 @@ public final class RequireJS {
                 return requireConfig;
 
             } catch (IOException e) {
-                log.warn("Could not create the RequireJS config for the " + webJar.getKey() + " " + webJar.getValue() + " WebJar" + " from " + path + "\n" +
-                        "Error: " +  e.getMessage() + "\n" +
-                        "Please file a bug at: http://github.com/webjars/webjars-locator/issues/new");
+                log.warn(
+                    "Could not create the RequireJS config for the {} {} WebJar from {}\nError: {}\nPlease file a bug at: http://github.com/webjars/webjars-locator/issues/new",
+                    webJar.getKey(), webJar.getValue(), path, e.getMessage());
             } catch (IllegalArgumentException e) {
-                log.warn("Could not create the RequireJS config for the " + webJar.getKey() + " " + webJar.getValue() + " WebJar" + " from " + path + "\n" +
-                        "There was not enough information in the package metadata to do so.\n" +
-                        "Error: " +  e.getMessage() + "\n" +
-                        "If you think you have received this message in error, " +
-                        "please file a bug at: http://github.com/webjars/webjars-locator/issues/new");
+                log.warn(
+                    "Could not create the RequireJS config for the {} {} WebJar from {}\nThere was not enough information in the package metadata to do so.\nError: {}\nIf you think you have received this message in error, please file a bug at: http://github.com/webjars/webjars-locator/issues/new",
+                    webJar.getKey(), webJar.getValue(), path, e.getMessage());
             } finally {
                 try {
                     inputStream.close();
@@ -458,15 +432,7 @@ public final class RequireJS {
     }
 
     private static boolean hasIndexFile(String path) {
-        InputStream resourceAsStream = RequireJS.class.getClassLoader().getResourceAsStream(path);
-        try {
-            return resourceAsStream != null;
-        } finally {
-            if (resourceAsStream != null) try {
-                resourceAsStream.close();
-            } catch (IOException ignored) {
-            }
-        }
+        return RequireJS.class.getClassLoader().getResource(path) != null;
     }
 
     /*
@@ -474,54 +440,34 @@ public final class RequireJS {
      */
 
     private static String getBowerBestMatchFromMainArray(ArrayList<String> items, String name) {
-        if(items.size() == 1) // not really much choice here
+        if (items.size() == 1) // not really much choice here
+        {
             return items.get(0);
+        }
 
-        ArrayList<String> filteredList = new ArrayList<>();
+        List<String> filteredList = new ArrayList<>(items.size());
 
         // first idea: only look at .js files
 
-        for(String item : items) {
-            if(item.toLowerCase().endsWith(".js")) {
+        for (String item : items) {
+            if (item.toLowerCase(Locale.ENGLISH).endsWith(".js")) {
                 filteredList.add(item);
             }
         }
 
         // ... if there are any
-        if(filteredList.size() == 0)
+        if (filteredList.isEmpty()) {
             filteredList = items;
-
-        final HashMap<String, Integer> distanceMap = new HashMap<>();
-        final String nameForComparisons = name.toLowerCase();
+        }
 
         // second idea: most scripts are named after the project's name
         // sort all script files by their Levenshtein-distance
         // and return the one which is most similar to the project's name
-
-        Collections.sort(filteredList, new Comparator<String>() {
-
-            Integer getDistance(String value) {
-                int distance;
-                value = value.toLowerCase();
-                if (distanceMap.containsKey(value)) {
-                    distance = distanceMap.get(value);
-                } else {
-                    distance = StringUtils.getLevenshteinDistance(nameForComparisons, value);
-                    distanceMap.put(value, distance);
-                }
-                return distance;
-            }
-
-            @Override
-            public int compare(String o1, String o2) {
-                return getDistance(o1).compareTo(getDistance(o2));
-            }
-        });
-
+        filteredList.sort(new LevenshteinDistanceComparator(name.toLowerCase(Locale.ENGLISH)));
         return filteredList.get(0);
     }
 
-    private static JsonNode mainJsToPathJson(Map.Entry<String, String> webJar, String main, List<Map.Entry<String, Boolean>> prefixes) {
+    private static JsonNode mainJsToPathJson(Entry<String, String> webJar, String main, Iterable<Entry<String, Boolean>> prefixes) {
         String requireJsStyleMain = main;
         if (main.endsWith(".js")) {
             requireJsStyleMain = main.substring(0, main.lastIndexOf(".js"));
@@ -531,12 +477,12 @@ public final class RequireJS {
             requireJsStyleMain = requireJsStyleMain.substring(2);
         }
 
-        String unprefixedMain = webJar.getKey() + "/" + webJar.getValue() + "/" + requireJsStyleMain;
+        String unprefixedMain = String.format("%s/%s/%s", webJar.getKey(), webJar.getValue(), requireJsStyleMain);
 
         ArrayNode arrayNode = new ArrayNode(JsonNodeFactory.instance);
 
-        for (Map.Entry<String, Boolean> prefix : prefixes) {
-            arrayNode.add(prefix.getKey() + unprefixedMain);
+        for (Entry<String, Boolean> prefix : prefixes) {
+            arrayNode.add(String.format("%s%s", prefix.getKey(), unprefixedMain));
         }
 
         return arrayNode;
@@ -548,17 +494,18 @@ public final class RequireJS {
      * @param webJar A tuple (artifactId -> version) representing the WebJar.
      * @return The error message.
      */
-    private static String requireJsConfigErrorMessage(Map.Entry<String, String> webJar) {
-        return "Could not read WebJar RequireJS config for: " + webJar.getKey() + " " + webJar.getValue() + "\n" +
-                "Please file a bug at: http://github.com/webjars/" + webJar.getKey() + "/issues/new";
+    private static String requireJsConfigErrorMessage(Entry<String, String> webJar) {
+        return String.format("Could not read WebJar RequireJS config for: %s %s\nPlease file a bug at: http://github.com/webjars/%s/issues/new", webJar.getKey(), webJar.getValue(),
+            webJar.getKey());
     }
 
     /**
      * @param webJar A tuple (artifactId -&gt; version) representing the WebJar.
      * @return The raw RequireJS config string from the WebJar's pom.xml meta-data.
      */
-    public static String getRawWebJarRequireJsConfig(Map.Entry<String, String> webJar) {
-        String filename = WEBJARS_MAVEN_PREFIX + "/" + webJar.getKey() + "/pom.xml";
+    @Nonnull
+    public static String getRawWebJarRequireJsConfig(@Nonnull Entry<String, String> webJar) {
+        String filename = String.format("%s/%s/pom.xml", WEBJARS_MAVEN_PREFIX, webJar.getKey());
         InputStream inputStream = RequireJS.class.getClassLoader().getResourceAsStream(filename);
 
         if (inputStream != null) {
@@ -574,7 +521,7 @@ public final class RequireJS {
                     NodeList propertyNodes = propertiesNodes.item(i).getChildNodes();
                     for (int j = 0; j < propertyNodes.getLength(); j++) {
                         Node node = propertyNodes.item(j);
-                        if (node.getNodeName().equals("requirejs")) {
+                        if ("requirejs".equals(node.getNodeName())) {
                             return node.getTextContent();
                         }
                     }
@@ -597,6 +544,7 @@ public final class RequireJS {
         return "";
     }
 
+
     /**
      * The legacy webJars-requirejs.js based RequireJS config for a WebJar.
      *
@@ -604,39 +552,26 @@ public final class RequireJS {
      * @return The contents of the webJars-requirejs.js file.
      */
     @Deprecated
-    public static String getWebJarConfig(Map.Entry<String, String> webJar) {
-        String webJarConfig = "";
-
-        // read the webJarConfigs
-        String filename = WebJarAssetLocator.WEBJARS_PATH_PREFIX + "/" + webJar.getKey() + "/" + webJar.getValue() + "/" + "webjars-requirejs.js";
+    @Nullable
+    public static String getWebJarConfig(@Nonnull Entry<String, String> webJar) {
+        String filename = String.format("%s/%s/%s/webjars-requirejs.js", WebJarAssetLocator.WEBJARS_PATH_PREFIX, webJar.getKey(), webJar.getValue());
         InputStream inputStream = RequireJS.class.getClassLoader().getResourceAsStream(filename);
         if (inputStream != null) {
-            log.warn("The " + webJar.getKey() + " " + webJar.getValue() + " WebJar is using the legacy RequireJS config.\n" +
-                    "Please try a new version of the WebJar or file or file an issue at:\n" +
-                    "http://github.com/webjars/" + webJar.getKey() + "/issues/new");
-
-            StringBuilder webJarConfigBuilder = new StringBuilder("// WebJar config for " + webJar.getKey() + "\n");
-            BufferedReader br = new BufferedReader(new InputStreamReader(inputStream));
-            try {
-                String line;
-
-                while ((line = br.readLine()) != null) {
-                    webJarConfigBuilder.append(line).append("\n");
-                }
-
-                webJarConfig = webJarConfigBuilder.toString();
-            } catch (IOException e) {
-                log.warn(filename + " could not be read.");
-            } finally {
-                try {
-                    br.close();
-                } catch (IOException e) {
-                    // really?
-                }
+            log.warn(
+                "The {} {} WebJar is using the legacy RequireJS config.\nPlease try a new version of the WebJar or file or file an issue at:\nhttp://github.com/webjars/{}/issues/new",
+                webJar.getKey(), webJar.getValue(), webJar.getKey());
+            String fileContent = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8)).lines().collect(Collectors.joining("\n"));
+            if (StringUtils.isBlank(fileContent)) {
+                return null;
             }
+            return new StringBuilder()
+                .append("// WebJar config for ")
+                .append(webJar.getKey())
+                .append('\n')
+                .append(fileContent.trim())
+                .toString();
         }
-
-        return webJarConfig;
+        return null;
     }
 
 }

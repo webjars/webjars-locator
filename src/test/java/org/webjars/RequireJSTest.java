@@ -1,26 +1,33 @@
 package org.webjars;
 
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-
-import static org.junit.Assert.*;
+import javax.script.ScriptException;
+import org.junit.Test;
+import org.mozilla.javascript.Context;
+import org.mozilla.javascript.Scriptable;
 
 public class RequireJSTest {
 
-    private static String WEBJAR_URL_PREFIX = "/webjars/";
-    private static String WEBJAR_CDN_PREFIX = "http://cdn.jsdelivr.net/webjars/";
+    private static final String WEBJAR_URL_PREFIX = "/webjars/";
+    private static final String WEBJAR_CDN_PREFIX = "http://cdn.jsdelivr.net/webjars/";
 
     @Test
-    public void should_generate_correct_javascript() {
+    public void should_generate_correct_javascript() throws ScriptException {
         String javaScript = RequireJS.getSetupJavaScript(WEBJAR_URL_PREFIX);
 
-        assertTrue(javaScript.indexOf("\"bootstrap\":\"3.1.1\"") > 0);
+        assertTrue(javaScript.indexOf("\"bootstrap\":\"3.1.1\",") > 0);
+
+        assertSyntax(javaScript);
+
     }
 
     @Test
@@ -118,6 +125,13 @@ public class RequireJSTest {
     public void should_load_webjar_without_requirejs_properties() {
         ObjectNode objectNode = RequireJS.getWebJarRequireJsConfig(new AbstractMap.SimpleEntry<>("bootswatch", "2.3.1"), Collections.<Map.Entry<String, Boolean>>emptyList());
         assertEquals(0, objectNode.size());
+    }
+
+    private static void assertSyntax(String javaScript) {
+        try (Context context = Context.enter()){
+            Scriptable scope = context.initStandardObjects();
+            context.evaluateString(scope, javaScript, "setup-template.mustache", 1, null);
+        }
     }
 
 }
