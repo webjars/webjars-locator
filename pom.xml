@@ -140,7 +140,7 @@
         <dependency>
             <groupId>org.webjars.bower</groupId>
             <artifactId>angular-schema-form</artifactId>
-            <version>0.8.2</version>
+            <version>0.8.13</version>
             <scope>test</scope>
         </dependency>
         <dependency>
