@@ -135,7 +135,10 @@ public final class RequireJS {
                 // default to the new pom.xml meta-data way
                 ObjectNode webJarObjectNode = getWebJarSetupJson(webJar, prefixesWithVersion);
                 if ((webJarObjectNode != null ? webJarObjectNode.size() : 0) == 0) {
-                    webJarConfigsString.append('\n').append(getWebJarConfig(webJar));
+                    String legacyWebJarConfig = getWebJarConfig(webJar);
+                    if (legacyWebJarConfig != null) {
+                        webJarConfigsString.append('\n').append(legacyWebJarConfig);
+                    }
                 } else {
                     requireJsConfigs.add(webJarObjectNode.toString());
                 }
