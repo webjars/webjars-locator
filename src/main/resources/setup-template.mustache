@@ -15,7 +15,8 @@ const webjars = {
     }
 };
 
-const require = {
+// this is a var because RequireJS needs it to be
+var require = {
     callback: function () {
         // Deprecated WebJars RequireJS plugin loader
         define('webjars', function () {
