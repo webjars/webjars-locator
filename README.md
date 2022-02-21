@@ -5,4 +5,4 @@ This poorly named library is really just the RequireJS support that wraps the [w
 
 [Check out the JavaDoc](https://javadoccentral.herokuapp.com/org.webjars/webjars-locator/latest)
 
-[![Build Status](https://travis-ci.com/webjars/webjars-locator.svg?branch=master)](https://travis-ci.com/webjars/webjars-locator)
+[![.github/workflows/test.yml](https://github.com/webjars/webjars-locator/actions/workflows/test.yml/badge.svg)](https://github.com/webjars/webjars-locator/actions/workflows/test.yml)

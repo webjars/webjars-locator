@@ -1,0 +1,47 @@
+const webjars = {
+    versions: {
+        {{#versions}}
+            "{{webJarId}}":"{{webJarVersion}}",
+        {{/versions}}
+    },
+    path: function (webJarId, path) {
+        console.error('The webjars.path() method of getting a WebJar path has been deprecated.  The RequireJS config in the ' + webJarId
+            + ' WebJar may need to be updated.  Please file an issue: http://github.com/webjars/' + webJarId + '/issues/new');
+        return [
+            {{#webJarPaths}}
+                '{{prefix}}' + webJarId + '/' + webjars.versions[webJarId] + '/' + path{{#comma}},{{/comma}}
+            {{/webJarPaths}}
+        ];
+    }
+};
+
+const require = {
+    callback: function () {
+        // Deprecated WebJars RequireJS plugin loader
+        define('webjars', function () {
+            return {
+                load: function (name, req, onload, config) {
+                    if (name.indexOf('.js') >= 0) {
+                        console.warn('Detected a legacy file name (' + name
+                            + ') as the thing to load.  Loading via file name is no longer supported so the .js will be dropped in an effort to resolve the module name instead.');
+                        name = name.replace('.js', '');
+                    }
+                    console.error('The webjars plugin loader (e.g. webjars!' + name + ') has been deprecated.  The RequireJS config in the ' + name
+                        + ' WebJar may need to be updated.  Please file an issue: http://github.com/webjars/webjars/issues/new');
+                    req([name], function () {
+                        onload();
+                    });
+                }
+            }
+        });
+
+        // All the WebJar configs
+
+        {{#requireJsConfigs}}
+            requirejs.config({{{.}}});
+        {{/requireJsConfigs}}
+
+        {{{webJarConfigsString}}}
+
+    }
+};
