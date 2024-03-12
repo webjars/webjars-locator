@@ -5,9 +5,6 @@ updates:
     schedule:
       interval: daily
     open-pull-requests-limit: 10
-    ignore:
-      - dependency-name: "jackson-databind"
-        versions: ["2.x"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
